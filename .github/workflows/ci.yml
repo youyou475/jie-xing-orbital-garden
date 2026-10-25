@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 构建校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 打包前端（esbuild → app.bundle.js）
+        run: npm run build
+
+      - name: 生成单文件版并自检
+        run: npm run standalone
+
+      - name: 校验产物存在且自包含
+        run: |
+          test -s app.bundle.js
+          test -s standalone.html
+          # 单文件版不得残留任何外部脚本引用
+          if grep -q 'src="app.bundle.js' standalone.html; then
+            echo "standalone.html 残留外部脚本引用，构建产物不合法"; exit 1
+          fi
+          echo "构建产物校验通过"
+
+  python:
+    name: 建模脚本语法校验
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 语法检查（不执行，Blender 运行环境不提供）
+        run: |
+          python -m py_compile Blender工程/scripts/build_garden.py
+          python -m py_compile Blender工程/scripts/render_preview.py
+          echo "建模脚本语法检查通过"

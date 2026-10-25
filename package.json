@@ -1,0 +1,19 @@
+{
+  "name": "jie-xing-orbital-garden",
+  "version": "1.0.0",
+  "private": true,
+  "description": "《借星》· 网师园的轨道移植 —— Blender 程序化建模 + Three.js 第一人称空间漫游",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild app.js --bundle --minify --format=iife --target=es2019 --outfile=app.bundle.js",
+    "standalone": "node gen_standalone.cjs",
+    "serve": "python3 -m http.server 8802",
+    "start": "npm run build && npm run standalone"
+  },
+  "dependencies": {
+    "three": "0.160.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}

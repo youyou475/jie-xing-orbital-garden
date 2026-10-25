@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>《借星》· 网师园的轨道移植</title>
+<link rel="icon" href="data:," />
+<style>
+  :root{
+    --ink:#0b0e14; --ink2:#151a24; --line:rgba(255,255,255,.14);
+    --txt:#e8eaf0; --dim:#9aa3b2; --gold:#e6c88a; --cyan:#6fb4e8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--ink);color:var(--txt);
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+  canvas{display:block}
+  .layer{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:40}
+  #intro{background:radial-gradient(120% 90% at 50% 30%, #101725 0%, #06080d 70%);flex-direction:column;gap:18px;cursor:pointer}
+  #intro h1{font-size:54px;letter-spacing:.32em;font-weight:500;text-indent:.32em}
+  #intro .sub{color:var(--dim);font-size:15px;letter-spacing:.18em}
+  #intro .line{width:180px;height:1px;background:var(--line)}
+  #intro .desc{max-width:560px;text-align:center;line-height:2;color:var(--dim);font-size:13.5px;padding:0 24px}
+  #intro .go{margin-top:10px;padding:11px 30px;border:1px solid var(--gold);color:var(--gold);
+    border-radius:2px;font-size:13px;letter-spacing:.24em}
+  #loading{background:#06080d;flex-direction:column;gap:14px;z-index:50}
+  #loading .bar{width:240px;height:2px;background:rgba(255,255,255,.12)}
+  #loading .bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+  #loading .t{font-size:12.5px;color:var(--dim);letter-spacing:.14em}
+  #hud{position:fixed;inset:auto 0 0 0;z-index:20;display:flex;justify-content:space-between;
+    align-items:flex-end;padding:18px 22px;pointer-events:none}
+  #keys{font-size:12px;color:var(--txt);letter-spacing:.06em;line-height:1.9}
+  #keys b{color:var(--txt);font-weight:500}
+  #prog{font-size:12px;color:var(--dim);letter-spacing:.1em;text-align:right}
+  #prog .n{color:var(--gold)}
+  /* 屏幕按钮：鼠标点击即可，不依赖键盘焦点 */
+  #btns{position:fixed;left:22px;bottom:72px;z-index:21;display:flex;gap:8px;flex-wrap:wrap}
+  #btns button{pointer-events:auto;cursor:pointer;background:rgba(14,19,30,.82);
+    border:1px solid var(--line);color:var(--txt);font-size:12px;letter-spacing:.08em;
+    padding:6px 14px;border-radius:2px;font-family:inherit;
+    transition:border-color .25s,color .25s;backdrop-filter:blur(6px)}
+  #btns button:hover{border-color:rgba(230,200,138,.55);color:var(--gold)}
+  #btns button.on{border-color:var(--gold);color:var(--gold)}
+  #btns button.alt{display:none}
+  body.flying #btns button.alt{display:inline-block}
+  /* 探测地图（右下角） */
+  #minimap{position:fixed;right:22px;bottom:46px;z-index:21;width:230px;height:164px;
+    background:rgba(7,10,17,.86);border:1px solid var(--line);border-radius:3px;
+    backdrop-filter:blur(6px);pointer-events:none}
+  #rail{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:10px}
+  #rail span{font-size:11px;color:#5d6675;letter-spacing:.1em;transition:color .4s}
+  #rail span.cur{color:var(--cyan)}
+  #rail span.on{color:var(--gold)}
+  #guide{color:var(--gold);letter-spacing:.08em}
+  #card{position:fixed;left:50%;bottom:74px;transform:translateX(-50%) translateY(14px);z-index:22;
+    width:min(620px,calc(100vw - 48px));background:rgba(10,13,20,.86);border:1px solid var(--line);
+    border-radius:3px;padding:18px 22px;opacity:0;transition:opacity .45s,transform .45s;
+    backdrop-filter:blur(6px);pointer-events:none}
+  #card.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #card .id{font-size:11px;color:var(--cyan);letter-spacing:.22em}
+  #card h2{font-size:19px;font-weight:500;margin:6px 0 2px;letter-spacing:.06em}
+  #card .sub{font-size:12px;color:var(--dim);letter-spacing:.08em}
+  #card p{font-size:13.5px;line-height:1.95;color:#cfd5e0;margin-top:10px}
+  #toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:30;
+    font-size:13px;color:var(--gold);letter-spacing:.2em;opacity:0;transition:opacity .5s;pointer-events:none}
+  #cross{position:fixed;top:50%;left:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;
+    border-radius:50%;background:rgba(255,255,255,.45);z-index:15;pointer-events:none}
+  .hide{display:none !important}
+</style>
+</head>
+<body>
+
+<div id="loading" class="layer">
+  <div class="t">正在装载轨道舱 · <span id="pct">0%</span></div>
+  <div class="bar"><i id="bar"></i></div>
+</div>
+
+<div id="intro" class="layer hide">
+  <h1>借星</h1>
+  <div class="sub">网师园的轨道移植 · JIE XING</div>
+  <div class="line"></div>
+  <div class="desc">
+    2140 年，人类把一座中国古典园林整体搬进近地轨道舱。<br>
+    园外已无景可借，于是月洞门成了舷窗，漏窗成了观察窗——<br>
+    八百年的「借景」，在星海里被重新借了一次。
+  </div>
+  <div class="go">点击进入漫游</div>
+  <div class="t" style="font-size:12px;color:var(--txt)">W A S D 行走 · 鼠标拖动转向 · F 飞行观察 · R 回到起点 · 左下角按钮同样可用</div>
+</div>
+
+<div id="rail"><span data-i="0">S1 门厅</span><span data-i="1">S2 曲廊</span><span data-i="2">S3 主厅</span><span data-i="3">S4 彩霞池</span><span data-i="4">S5 殿春簃</span></div>
+
+<div id="btns">
+  <button id="btn-fly" type="button">飞行观察</button>
+  <button id="btn-up" type="button" class="alt">上升</button>
+  <button id="btn-down" type="button" class="alt">下降</button>
+  <button id="btn-home" type="button">回到起点</button>
+</div>
+<canvas id="minimap" width="230" height="164"></canvas>
+
+<div id="hud">
+  <div id="keys">
+    <b>W A S D</b> 行走　<b>Shift</b> 加速　<b>F</b> 飞行观察　<b>R</b> 回到起点　<b>M</b> 小地图<br>
+    <span id="guide">走近五个叙事锚点，会浮出该空间的说明</span>
+  </div>
+  <div id="prog">已抵达 <span class="n" id="cnt">0</span> / 5</div>
+</div>
+<div id="cross"></div>
+<div id="card"><div class="id"></div><h2></h2><div class="sub"></div><p></p></div>
+<div id="toast"></div>
+
+<script src="app.bundle.js?v=4"></script>
+</body>
+</html>
